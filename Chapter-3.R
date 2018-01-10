@@ -121,6 +121,18 @@ ggplot(resp, aes(pred, rst)) +
 plot(hatvalues(a))
 abline(h = 4/nrow(Auto), col="red")
 
+###############################################################################
+# Applied Problem 9 (multiple Linear Regression)
+###############################################################################
+
+
+
+
+
+
+
+
+
 
 
 
