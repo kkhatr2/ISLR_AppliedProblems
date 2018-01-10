@@ -124,6 +124,83 @@ abline(h = 4/nrow(Auto), col="red")
 ###############################################################################
 # Applied Problem 9 (multiple Linear Regression)
 ###############################################################################
+library(corrgram)
+pairs(Auto)
+cor(Auto[,-9])
+corrgram(Auto)
+
+# C: Multiple Regression Model
+fit.mul <- lm(mpg ~ .-name, data=Auto)
+summary(fit.mul)
+# Based on multiple regression, horsepower is no longer significant.
+# The model does suggest that as the year increases by one unit, mpg also
+# increases by 0.75 units.
+# Now trying some other models with significant variables and their interactions
+# with non-significant variables.
+fit.mul1 <- lm(mpg ~ displacement+weight+year+origin+horsepower+
+                 weight:horsepower, data=Auto)
+summary(fit.mul1)
+# Now displacement is insignificant and horsepower is significant along with
+# its interaction with weight.
+# Trying another interaction of displacement and cylinders
+fit.mul2 <- lm(mpg ~ displacement+weight*horsepower+year+origin+
+                 displacement*cylinders, data=Auto)
+summary(fit.mul2)
+# With displacement, cylinders and their interaction, the model suggests that
+# all these are non-significant.
+# Plotting mpg VS displacement does show a non-linear decreasing relationship.
+ggplot(Auto, aes(cylinders, mpg))+ geom_point()
+ggplot(Auto, aes(displacement, mpg))+ geom_point()
+
+# Thus trying a transformation of displacement
+fit.mul3 <- lm(mpg ~ weight+year+origin, data=Auto)
+shapiro.test(rstudent(fit.mul3))
+summary(fit.mul3)
+confint(fit.mul3)
+# Log and sqrt transformationsof non-significant variables are not enough to 
+# help explain mpg.
+# Thus the best model that explains ~86% of the variation in mpg includes
+# weight, horsepower their interaction with year and origin.
+# Even then, the additional variables produce a lot of noise and lead to an 
+# excess number of leverage points. 
+par(mfrow=c(2,2))
+plot(fit.mul3)
+
+# GLHT on the model without interaction and with interaction terms and variables
+# is considered significantly different from fit.mul3.
+fit4 <- lm(mpg ~ weight*horsepower+year+origin, data=Auto)
+summary(fit4)
+anova(fit.mul3, fit4)
+
+resp <- data.frame(pred = predict(fit.mul3), rst = rstudent(fit.mul3),
+                   hii = hatvalues(fit.mul3))
+
+ol <- subset(resp, resp$rst > 3, select=c("rst", "pred"))
+
+ggplot(resp, aes(pred, rst)) +
+  ylim(-4.5,4.5) +
+  geom_point() +
+  geom_point(data=ol,aes(pred, rst), color="red") +
+  geom_text(data=ol, aes(pred, rst), label=rownames(ol), vjust = -0.6, size=3) +
+  geom_abline(intercept = c(-3,3), slope=c(0,0), color="orange",
+              linetype="dotted", size=1.2) +
+  labs(x="Predicted", y="R-Student", title="Predicted Vs R-Student",
+       subtitle="Points in Red are outliers")
+
+
+lev <- subset(resp, resp$hii > 2 * length(coef(fit.mul3))/nrow(Auto))
+
+ggplot(resp, aes(x=as.numeric(rownames(resp)), y=hii)) + 
+  geom_point() +
+  geom_point(data=lev, aes(x=as.numeric(rownames(lev)), y=hii), color='red') +
+  geom_abline(intercept=2 * length(coef(fit.mul3))/nrow(Auto), slope=0,
+              color="orange") +
+  geom_text(data=lev, aes(as.numeric(rownames(lev)), y=hii), 
+            label=rownames(lev), vjust=-0.6, size=3) +
+  labs(x="Index", y="Hat Diag", title="Leverage Points")
+
+
+
 
 
 
