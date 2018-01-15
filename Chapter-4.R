@@ -30,8 +30,9 @@ lds.fit <- lda(Direction ~ Lag1+Lag2, data=Smarket, subset=train)
 lda.pred <- predict(lds.fit, newdata = trainData)
 
 table(lda.pred$class, dir.2005)
+mean(lda.pred$class == dir.2005)
 
-
+# Fitting Quadratic Discriminant Analysis
 
 
 
