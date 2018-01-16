@@ -316,9 +316,28 @@ ggplot(res, aes(reorder(method, -misclass), misclass)) +
   theme(legend.position = "None")
 
 
-
-
+###############################################################################
+###### Problem 12
+###############################################################################
+# Writing Functions
+Power3 <- function(x){
+  result <- x^3
+  return (result)
+}
+Power2 <- function(x){
+  result = x^2
+  return (result)
+}
+PlotPower<- function(m, a, col="blue"){
+  if(a == 2)
+    result = apply(m, 1, Power2)
+  else
+    result = apply(m, 1, Power3)
   
+  plot(m, result, main="Power Curve",xlab = "x", ylab="Y", type="b", col = col)
+}
+ 
+PlotPower(matrix(-5:5, ncol=1), 2, "red")
   
   
   
