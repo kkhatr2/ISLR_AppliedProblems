@@ -223,3 +223,112 @@ ggplot(res, aes(reorder(method, -misclass), misclass)) +
        title="Misclass Rate of Different models for Classification") +
   theme(legend.position = "None")
 
+###############################################################################
+###### Problem 11
+###############################################################################
+mpg01data <- Auto[,-1]
+mpg01data$mpg01 <- ifelse(Auto$mpg > median(Auto$mpg),1,0)
+
+# the correlation plot suggests that many of the variables have very strong
+# correlation to each other:
+# correlation between cylinders and displacement = 0.95
+# correlation between weight and displacement = 0.93
+# correlation between weight and horsepower = 0.86
+# correlation between weight and cylindes = 0.89
+# There are more correlations suggesting that an ill conceived model if 
+# all the variables are used.
+corrplot::corrplot(cor(mpg01data[,-8]), method="ellipse", diag = F)
+
+# Splitting the data into training and test set
+# 20% to test and 80% to train
+set.seed(123)
+idx <- sample(1:nrow(mpg01data), 0.2 * nrow(mpg01data), replace = F)
+train <- mpg01data[-idx,]
+test <- mpg01data[idx,]
+
+# Using LDA to model mpg01 on related data from the training set
+# variables were chosen based on linear correlation to mpg01
+lda.fit <- lda(mpg01 ~ weigth+year+, data=train)
+print(lda.fit)
+
+lda.test <- predict(lda.fit, newdata=test)
+
+tr <- table(lda.test$class, test$mpg01)
+print(tr)
+print(paste("Misclassification rate for LDA: ", 
+            1 - round(sum(diag(tr))/sum(tr), 2)))
+
+# test error is very good. there are some false negatives
+# i.e model predicts high mpg when it actually is low mpg
+
+# Using the same variables as for the LDA in QDA
+qda.fit <- qda(mpg01 ~ weight+year, data=train)
+print(qda.fit)
+
+qda.test <- predict(qda.fit, newdata = test)
+
+tr1 <- table(qda.test$class, test$mpg01)
+print(tr1)
+print(paste("Misclassification rate for QDA: ", 
+            1 - round(sum(diag(tr1))/sum(tr1), 2)))
+
+
+# Test error for the QDA model is even better,
+# the model predicts 1 less false negative than LDA model to improve by 1%
+
+# Using the same variables as for the LDA in Logistic regression
+glm.fit <- glm(mpg01 ~ weight+year, data=train)
+summary(glm.fit)
+
+glm.test <- predict(glm.fit, newdata = test, type = "response")
+
+glm.test.class <- ifelse(glm.test > 0.5, 1, 0)
+
+tr2 <- table(glm.test.class, test$mpg01)
+print(tr2)
+print(paste("Misclassification rate for Logistic: ", 
+            1 - round(sum(diag(tr2))/sum(tr2), 2)))
+
+# Using knn classification for various values of k
+res <- data.frame(method = rep(NA, times=13), misclass = rep(-1, times=13))
+for(k in 1:10){
+  set.seed(k)
+  knn.fit <- knn(train[,c(4,6)], 
+                 test[,c(4,6)], 
+                 as.factor(train$mpg01),
+                 k)
+  
+  int.tab <- table(knn.fit, test$mpg01)
+  res[k,] <- c(paste("knn(", k, ")", sep = ""), 
+               1 - round(sum(diag(int.tab))/sum(int.tab), 3))
+}
+
+res[11,] <- c("LDA", 1 - round(sum(diag(tr))/sum(tr), 2))
+res[12,] <- c("QDA", 1 - round(sum(diag(tr1))/sum(tr1), 2))
+res[13,] <- c("Logistic", 1 - round(sum(diag(tr2))/sum(tr2), 2))
+res[,2] <- as.numeric(res[,2])
+
+ggplot(res, aes(reorder(method, -misclass), misclass)) +
+  geom_bar(aes(fill = method), stat="identity") +
+  geom_text(aes(label = misclass), size = 3, vjust= -0.6) +
+  labs(x = "Method", y = "Misclassification Rate",
+       title ="Test data Misclassification Rate for Auto dataset") +
+  theme(legend.position = "None")
+
+
+
+
+  
+  
+  
+  
+  
+
+
+
+
+
+
+
+
+
