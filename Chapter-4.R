@@ -223,19 +223,3 @@ ggplot(res, aes(reorder(method, -misclass), misclass)) +
        title="Misclass Rate of Different models for Classification") +
   theme(legend.position = "None")
 
-
-
-
-
-
-
-
-
-
-
-               
-               
-               
-
-
-
