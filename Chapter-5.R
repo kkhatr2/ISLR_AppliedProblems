@@ -114,8 +114,48 @@ boot(Auto, boot.fn, R= 1000)
 summary (lm(mpg ~ poly(horsepower, 2) ,data=Auto))$coef
 
 
+###############################################################################
+###### Applied Problem 5
+###############################################################################
+# Splitting the Default dataset into 80:20 and measuring the test error
+set.seed(1)
+idx = sample(1:nrow(Default), nrow(Default) * 0.8, replace = F)
+test <- Default[-idx,]
+glm.fit <- glm(default ~ income+balance, data=Default, 
+               family=binomial(link=logit), subset = idx)
 
+test.pred <- ifelse(predict(glm.fit, newdata = test, type="response") > 0.5,
+                "Yes", "No")
 
+# Confusion matrix of prediction and true values
+tr <- table(test.pred, test$default)
+print(paste("Misclassification error on test data: ", 
+            1 - sum(diag(tr))/sum(tr)))
+# Test Prediction misclassification error is 0.026
+
+# Manually doing split and validation to get the mean(mean(testError))
+mErr <- rep(0, 3)
+for(i in 1:3){
+  set.seed(i)
+  idx <- sample(1:nrow(Default), nrow(Default) * 0.8, replace=F)
+  test <- Default[-idx,]
+  glmFit <- glm(default ~ income+balance, data=Default, family=binomial(link=logit), 
+                 subset=idx)
+  test.pred <- ifelse(predict(glmFit, newdata = test, type="response") > 0.5,
+                      "Yes", "No")
+  mErr[i] <- mean(ifelse(test.pred == test$default, 0, 1))
+  rm(idx, test, glmFit, test.pred)
+}
+mean(mErr)
+# Splitting the data into test and train, then computing the mean and then
+# the mean of those testdata means, value is 0.024. 
+# Given the ratio of defaults in the test data were about 0.03, the 
+# error is marginally better than a guess and, the model predicts considerably
+# negatives more false.
+
+###############################################################################
+###### Applied Problem 6
+###############################################################################
 
 
 
