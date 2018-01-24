@@ -1,6 +1,7 @@
 library(ISLR)
 library(boot)
 library(ggplot2)
+library(MASS)
 
 # Leave One Out Cross Validation (LOOCV)
 # LOOCV results in a stable model as the MSE that is generated is only from one
@@ -227,5 +228,48 @@ plot(cvErr, type="b")
 
 
 ###############################################################################
-###### Applied Problem 8
+###### Applied Problem 9
 ###############################################################################
+# Based on the Boston dataset from MASS library
+#A Population estimate for "medv" is the mean of the medv variable
+muhat_medv <-mean(Boston$medv)
+# B
+se_muhat_medv <- sd(Boston$medv) / sqrt(nrow(Boston))
+# Mean estimate for medv = 22.53 with a standard error of 0.41
+
+# C Using Bootstrap to construct the standard error
+boot.fn = function(data, idx){
+  return(mean(data$medv[idx]))
+}
+
+b = boot(Boston, boot.fn, R=500)
+# Computing Standard Error using the formula or bootstrap yeilds the same result.
+
+# D
+# Based on the bootstrap standard error and the z-value of 1.96
+# The 95% CI for medv is:
+c(b[[1]] - 1.96 * 0.22218, b[[1]] + 1.96 * 0.22218)
+# T-test confidence interval
+t.test(Boston$medv)$conf.int
+
+# T-test 95% CI is more conservative, as in it is much wider than the bootstrap
+# CI. This is because bootstrap is non-parametric and uses the data to generate
+# standard errors whereas T-test is parametric and is associated with area under
+# a curve for respective degrees of freedom, is parametric and its CI is 
+# computed based on the quantile value which, based on the sample size could be
+# much different than 1.96.
+
+# E
+# Estimate for the median = 21.2, 50% quantile
+median(Boston$medv)
+
+# There is no popular formula for computing std. err for the median
+# so, using bootstrap
+boot.fn = function(data, idx){
+  return(median(data$medv[idx]))
+}
+
+boot(Boston, boot.fn, R=500)
+# Bootstrap SE for the median is 0.38
+# The median interval does not includ the mean which suggests tht the data
+# is skewed. Since the median is smaller than the mean, the data is left skewed.
