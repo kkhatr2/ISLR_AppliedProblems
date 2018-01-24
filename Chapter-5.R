@@ -174,6 +174,27 @@ boot(data = Default, statistic = boot.fn, R = 500)
 ###############################################################################
 ###### Applied Problem 7
 ###############################################################################
+sumError <- 0
+for(i in 1:nrow(Weekly)){
+  glm.fit <- glm(Direction ~ Lag1+Lag2, data=Weekly[-i,], family=binomial)
+  loocv.pred <- predict(glm.fit, newdata = Weekly[i,], type="response")
+  loocv.class <- ifelse(loocv.pred > 0.5, "Up", "Down")
+  sumError <- sumError + ifelse(loocv.class != Weekly$Direction[i], 1, 0)
+  rm(glm.fit, loocv.pred, loocv.class)
+}
+loocvMSE <- sumError / nrow(Weekly)
+# Using the LOOCV the error rate is 0.45, which suggests that the model is
+# correct only for a little bit more than half the time for an unknown value of
+# Lag1 and Lag2.
+# To use cv.glm we have to consturct our own cost function, 
+# for a binomial, cost function in the help pages is good, otherwise
+# cv.glm uses the default cost function of Mean Squared Loss.
+
+
+
+
+
+
 
 
 
