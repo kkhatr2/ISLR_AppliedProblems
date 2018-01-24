@@ -165,6 +165,7 @@ boot.fn = function(data, idx){
                 subset=idx))
   return(b)
 }
+set.seed(1)
 boot(data = Default, statistic = boot.fn, R = 500)
 # Using bootstrap sampling 500 times to compute standard errors
 # The computed standard errors are very similar to the standard glm() results.
@@ -190,11 +191,41 @@ loocvMSE <- sumError / nrow(Weekly)
 # for a binomial, cost function in the help pages is good, otherwise
 # cv.glm uses the default cost function of Mean Squared Loss.
 
+###############################################################################
+###### Applied Problem 8
+###############################################################################
+# Generating a simulated dataset
+# Using the model Y = X - 2X^2 + e for response.
+set.seed(1)
+x = rnorm(100)
+y = x - 2 * x^2 + rnorm(100)
+data = data.frame(x = x, y = y)
+rm(x, y)
+
+# As expected data is a reverse parabola with maximum points clustered
+# around x = 0 because, x is from a normal dist. with mean = 0 and sd = 1
+ggplot(data, aes(x, y)) +
+  geom_point()
+
+cvErr = c(0,0,0,0)
+for(i in 1:4){
+  fit1 = glm(y ~ poly(x, i), data=data)
+  set.seed(0)
+  cvErr[i] = cv.glm(data, fit1)$delta[1]
+}
+plot(cvErr, type="b")
+
+# Setting a random seed for LOOCV does not matter because it is inconsequential
+# how we select which observation is left out. The point being only one 
+# observation has to be left out and only once and, it doesn't matter which
+# observation we leave out first. The cross-validated error will be the same.
+
+# Because data was generated from a quadratic equation, we expect the quadratic
+# term to be significant and none others. Least square fit reports just that
+# from a summary() of the polynomial with 4th order term, both the 3rd and 4th 
+# order terms are not significant as expected and only the linear and quadratic are.
 
 
-
-
-
-
-
-
+###############################################################################
+###### Applied Problem 8
+###############################################################################
