@@ -156,7 +156,24 @@ mean(mErr)
 ###############################################################################
 ###### Applied Problem 6
 ###############################################################################
+# SE(beta-hat) = sqrt(vcov(fit)[i,i]); for glm fits
+glm.fit <- glm(default ~ income+balance, data=Default, family=binomial)
+summary(glm.fit)
 
+boot.fn = function(data, idx){
+  b <- coef(glm(default ~ income+balance, data=data, family = binomial(link=logit),
+                subset=idx))
+  return(b)
+}
+boot(data = Default, statistic = boot.fn, R = 500)
+# Using bootstrap sampling 500 times to compute standard errors
+# The computed standard errors are very similar to the standard glm() results.
+# I believe because the model fits well and the binomial is a parametric method
+# The standard errors computed using either bootstrap or glm() are starkedly alike.
+
+###############################################################################
+###### Applied Problem 7
+###############################################################################
 
 
 
