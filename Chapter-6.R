@@ -2,7 +2,7 @@ library(ISLR)
 library(leaps)
 
 ###################################################################################
-########## Lab
+########## Lab, Best Subset
 ###################################################################################
 
 # Removing players without recorded Salary
@@ -105,9 +105,103 @@ best10 = regsubsets(Salary ~ ., data=hitters, nvmax = 19)
 plot(coef(best10, id=10)[-1])
 
 
+###################################################################################
+########## Lab, Ridge Lasso
+###################################################################################
+library(glmnet)
+x = model.matrix(Salary ~ ., data=hitters)[,-1] # -1 to remove the intercept column
+y = hitters$Salary
+
+# For the glmnet() function:
+# For Ridge alpha = 0
+# For Lasso alpha = 1
+# glmnet() standardizes explatory variabkes to be on the same scale
+# Although, glmnet chooses the values for lambda, we can also provide these
+grid = 10^seq(10,-2, length.out = 100) # selecting values from 10^10 to 10^-2
+ridge.mod = glmnet(x = x, y =  y, family = "gaussian", alpha = 0, lambda = grid)
+plot(ridge.mod)
+
+# Coefficients for each lambda are in a 20 x 100 matrix
+# 20 rows for each p and 100 columns for each value of lambda
+dim(coef(ridge.mod))
+# grid[50] = lambda = 11497.57
+# Coefficients for lambda = 11497.57
+ridge.mod$lambda[50]
+coef(ridge.mod)[,50]
+# and their "ell"2 norm
+# Smaller "eel"2 norm suggests that most of the coefficients have shrunken to 0
+sqrt(sum(coef(ridge.mod)[-1,50]^2))
+
+# in contrast for lambda[60] = 705.4802
+ridge.mod$lambda[60]
+coef(ridge.mod)[,60]
+sqrt(sum(coef(ridge.mod)[-1,60]^2))
+
+# Getting coefficients for a lambda not originally in the grid
+predict(ridge.mod, s = 50, type = "coefficients")
+
+# Now split the dataset for cross-validation
+# I am using 80:20
+set.seed(1)
+idx = sample(1:nrow(hitters), nrow(hitters) * 0.8)
+
+ridge.mod = glmnet(x = x[idx,], y = y[idx], alpha = 0, lambda = grid,
+                   thresh = 1e-12)
+ridge.pred = predict(ridge.mod, newx = x[-idx,], type="response", s = 4)
+# R-squared for prediction 1 - mse / sst
+1 - mean((ridge.pred - y[-idx])^2) / mean((y[-idx] - mean(y[-idx]))^2)
+
+mean((predict(ridge.mod, newx = x[idx,], s=4) - y[idx])^2)
+# R-squared for the model 1 - mse / sst
+1 - mean((predict(ridge.mod, newx = x[idx,], s=4) - y[idx])^2) / 
+  mean((y[idx] - mean(y[idx]))^2)
+
+library(doParallel)
+cl = makePSOCKcluster(4)
+registerDoParallel(cl)
+# using cross validation with the build in cv.glmnet() function
+set.seed(0)
+cv.out = cv.glmnet(x = x[idx,], y = y[idx], type.measure = "mse", 
+                   parallel = T, alpha = 0)
+stopCluster(cl)
+plot(cv.out)
+cv.out$lambda.1se
+cv.out$lambda.min
+
+ridge.pred = predict(ridge.mod, s = cv.out$lambda.min, newx = x[-idx,])
+mean((ridge.pred - y[-idx])^2)
+1 - mean((ridge.pred - y[-idx])^2) / mean((y[-idx] - mean(y[-idx]))^2)
+predict(ridge.mod, s = cv.out$lambda.min, type="coefficients")
+
+# "ell"2 norm for ridge
+sqrt(sum(predict(ridge.mod, s = cv.out$lambda.min, type="coefficients")^2))
+# "ell"2 norm for least squares suggests that the coefficients have shrunk
+# but not as much.
+sqrt(sum(predict(ridge.mod, s = 0, type="coefficients")^2))
+
+# The cross validated minimum lambda offers a litte worse fit than 
+# the randomly selected value of 4
+ridge.pred = predict(ridge.mod, s = cv.out$lambda.1se, newx = x[-idx,])
+mean((ridge.pred - y[-idx])^2)
+1 - mean((ridge.pred - y[-idx])^2) / mean((y[-idx] - mean(y[-idx]))^2)
+# Lambda 1se is much worse with a r-sq = 0.32
 
 
+# Using the same glmnet package for fitting the lasso
+# alpha = 1 is for lasso and using the same grid as for ridge
+lasso.mod = glmnet(x[idx,], y[idx], alpha = 1, lambda = grid)
+plot(lasso.mod)
 
+set.seed(1)
+cv.out = cv.glmnet(x[idx,], y[idx], alpha = 1, type.measure = "mse")
+plot(cv.out)
 
+bestLambda = cv.out$lambda.min
+lasso.pred = predict(lasso.mod, newx = x[-idx,], s = bestLambda)
+mean((lasso.pred - y[-idx])^2)
+1 - mean((lasso.pred - y[-idx])^2) / mean((y[-idx] - mean(y[-idx]))^2)
+predict(lasso.mod, s = cv.out$lambda.1se, type="coefficients")
 
-
+# Lasso test mse is similar to the ridge mse with lambda = 4
+# Lasso R-sq is similar to the ridge with lambda = 4
+# Lasso results in using 14 out of 19 variables
