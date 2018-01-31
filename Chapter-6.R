@@ -60,3 +60,47 @@ mean((data$y - predict(cv.out, s="lambda.min", newx = mm, type="response"))^2)
 # Shrinkage is less at lambda = 0.0694 and the lasso coefficients do not
 # entirely agree with the generating model parameters.
 
+# 7.f
+# using the model y = b0 + b1 * x^7 + err
+# For this model, and a limited range of X, response y looks like a horizontal line
+data$y = 1 + 2 * x^7 + eps
+plot(x, data$y)
+
+regfit = regsubsets(y ~ ., data=data, nvmax = 10)
+summary(regfit)
+
+plot(regfit, scale="bic")
+plot(regfit, scale="Cp")
+coef(regfit, id=1)
+yhat = cbind(matrix(rep(1), 100, ncol=1), data$x7) %*% 
+                matrix(coef(regfit, id=1), ncol=1)
+mse = mean((data$y - yhat)^2)
+mst = mean((data$y - mean(data$y))^2)
+
+cbind(matrix(rep(1, 100), ncol=1), data$x7)
+
+# Best subset selection using only x^7 suggests:
+# The best 1 variable model is the one with x7, and x7 occurs in all subsequent
+# models with increasing number of variables. Thus, best-subset has identified
+# x7 as the most important variable.
+# BIC and CP selection criteria also suggests the model with one variable i.e. x7
+# is the best, for response generated using only x^7.
+# The model accuracy is also apparent from the Mean Squared Error (0.91) and
+# Mean Squared Total (22226.71).
+
+# Checking if Lasso also shrinks all variables except x7 to 0
+# alpha = 1 for Lasso
+mm = model.matrix(y ~ ., data=data)[,-1]
+lasso.fit = cv.glmnet(x = mm, y = data$y, alpha = 1)
+plot(lasso.fit)
+predict(lasso.fit, type="coefficients", s = "lambda.min")
+mse = mean((data$y - predict(lasso.fit, type="response", s = "lambda.min",
+            newx = mm))^2)
+
+# Lasso does a worse job of identifying the underlying structure of the data.
+# Although, lasso fails to identify underlying factors and chooses x5 and x7 but,
+# it places a very low weight on x5 with a coefficient estimate = 0.065.
+# Also the mse = 23.65 which is 10 times more than the best model from 
+# best-subset selection.
+
+
