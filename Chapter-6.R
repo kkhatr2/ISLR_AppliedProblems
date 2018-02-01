@@ -2,6 +2,8 @@ library(ISLR)
 library(glmnet)
 library(leaps)
 library(pls)
+library(MASS)
+library(ggplot2)
 
 ###################################################################################
 ######### Exerciese 8
@@ -12,7 +14,6 @@ eps = rnorm(100)
 y = -1 + 0.5*x - 0.5*x^2 + x^3 + eps
 data = data.frame(y = y, x1 = x, x2 = x^2, x3 = x^3, x4 = x^4,
                   x5 = x^5, x6 = x^6, x7 = x^7, x8 = x^8, x9 = x^9, x10 = x^10)
-
 plot(x, y)
 
 bestSubset = regsubsets(y ~ ., data = data, nvmax = 10)
@@ -96,11 +97,95 @@ plot(lasso.fit)
 predict(lasso.fit, type="coefficients", s = "lambda.min")
 mse = mean((data$y - predict(lasso.fit, type="response", s = "lambda.min",
             newx = mm))^2)
+lasso.fit$lambda.min
 
 # Lasso does a worse job of identifying the underlying structure of the data.
 # Although, lasso fails to identify underlying factors and chooses x5 and x7 but,
 # it places a very low weight on x5 with a coefficient estimate = 0.065.
 # Also the mse = 23.65 which is 10 times more than the best model from 
 # best-subset selection.
+
+# Clear variables for problem 8
+rm(y, data, lasso.fit, mm, regfit, y, yhat, eps, mse, mst, x)
+################################################################################
+### Problem 9
+################################################################################
+set.seed(123)
+idx = sample(1:nrow(College), size = nrow(College) * 0.8)
+
+MSTOTAL.TEST = mean((College$Apps[-idx] - mean(College$Apps[-idx]))^2)
+
+# Ordinary Least Squares
+lm.fit = lm(Apps ~ ., data=College, subset = idx)
+testLM.mse = mean((College$Apps[-idx] - predict(lm.fit, newdata = College[-idx,]))^2)
+lm.testr2 = 1 - testLM.mse / MSTOTAL.TEst
+
+# Ridge
+mm = model.matrix(Apps ~ ., data=College)[,-1]
+ridge.fit = cv.glmnet(x = mm[idx,], y = College$Apps[idx], alpha = 0)
+testRidge.mse = mean((College$Apps[-idx] - predict(ridge.fit,
+                                                   newx = mm[-idx,], 
+                                                   s = "lambda.min"))^2)
+ridge.testr2 = 1 - testRidge.mse / MSTOTAL.TEST
+
+# Lasso
+lasso.fit = cv.glmnet(x = mm[idx,], y = College$Apps[idx], alpha = 1)
+testLasso.mse = mean((College$Apps[-idx] - predict(lasso.fit,
+                                                   newx = mm[-idx,], 
+                                                   s = "lambda.min"))^2)
+lasso.testr2 = 1 - testLasso.mse / MSTOTAL.TEST
+
+# PCR
+pcr.fit = pcr(Apps ~ ., data = College, subset = idx, scale = T)
+summary(pcr.fit)
+
+testPCR.mse = mean((College$Apps[-idx] -  predict(pcr.fit, newdata=College[-idx,],
+                                                  type="response", ncomp=1:9))^2)
+pcr.testr2 = 1 - testPCR.mse / MSTOTAL.TEST
+
+# Like partial correlation plots
+plot(pcr.fit, ncomp =1:9, which="test", newdata = College[-idx,])
+
+# PLS
+pls.fit = plsr(Apps ~ ., data = College, subset = idx, scale = T)
+summary(pls.fit)
+
+testPLS.mse = mean((College$Apps[-idx] -  predict(pls.fit, newdata=College[-idx,],
+                                                  type="response", ncomp=1:9))^2)
+pls.testr2 = 1 - testPLS.mse / MSTOTAL.TEST
+
+#Results
+r2 = data.frame(method = c("Linear_Model","Ridge", "Lasso", "PCR", "PLS"),
+                R2 = c(lm.testr2, ridge.testr2, lasso.testr2, pcr.testr2,
+                        pls.testr2))
+estimates = data.frame("Linear_Model" = coef(lm.fit),
+                       "Ridge" = predict(ridge.fit, s = "lambda.min", type="coefficients")[,1],
+                       "Lasso" = predict(lasso.fit, s = "lambda.min", type="coefficients")[,1],
+                       "PCR" = as.numeric(coef(pcr.fit, ncomp=9, intercept = T)),
+                       "PLS" = as.numeric(coef(pls.fit, ncomp = 9, intercept = T)))
+
+ggplot(r2, aes(x = reorder(method, -R2), y = R2)) +
+  geom_point(aes(size=R2), color="blue") +
+  ylim(c(0.6, 0.9)) +
+  geom_text(aes(label = round(R2, 2)), vjust = -1.0) +
+  labs(x = "Method", y ="R-squared", title="R-squared Vs Method",
+       subtitle = "College dataset from ISLR package") +
+  theme(legend.position = "None")
+
+# Converting from wideview to longview
+d = gather(estimates, key=method, value=estimates, Linear_Model:PLS,
+           factor_key = T)
+
+ggplot(d, aes(method, estimates)) +
+  geom_point(aes(color=method)) +
+  labs(color = "Method", y = "Estimates",
+       title = "Coefficient estimates for different methods",
+       subtitle = "College dataset from ISLR package") +
+  facet_wrap(~est_names, scales = "free_y", nrow = 3) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+# Comments
+
+
 
 
