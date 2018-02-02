@@ -235,3 +235,76 @@ mse.reduced = sum((College$Apps - predict(lasso.fit, s="lambda.1se", newx = mm))
 mse.full = sum((College$Apps - predict(lasso.fit, s="lambda.min", newx = mm))^2) / df.full
 f.statistic = (mse.reduced - mse.full)/(df.reduced - df.full) / mse.full
 pf(f.statistic, df1 = (df.reduced - df.full), df2 = df.full)
+rm(list=ls())
+################################################################################
+### Problem 10
+################################################################################
+n = 1000
+eps = rnorm(n)
+data = data.frame(x1 = rnorm(n), 
+                  x2 = rnorm(n), 
+                  x3 = rnorm(n),
+                  x4 = rnorm(n), 
+                  x5 = rchisq(n, df=20),
+                  x6 = rnorm(n),
+                  x7 = rf(n, df1 = 5, df2 = 20),
+                  x8 = rnorm(n),
+                  x9 = rnorm(n),
+                  x10 = rt(n, df = 6), 
+                  x11 = rgamma(n, 2, 1),
+                  x12 = rbeta(n, 1,1), 
+                  x13 = rlogis(n), 
+                  x14 = rchisq(n, df=20),
+                  x15 = rt(n, df = 6), 
+                  x16 = rgamma(n, 2, 1),
+                  x17 = rbeta(n, 1,1), 
+                  x18 = rlogis(n), 
+                  x19 = rcauchy(n),
+                  x20 = rcauchy(n))
+
+data$y = as.matrix(cbind(rep(1,n), data[,1:12]), ncol=13) %*%
+                  matrix(c(1,2,0.9,-1,0.5, 6, -5, 10, -1.1, -7,3.3, -1, 1), 
+                         ncol=1)+eps
+set.seed(0)
+idx = sample(1:n, 100)
+
+best.subset = regsubsets(y ~ ., data[idx,], nvmax = 20)
+summary(best.subset)
+
+predict.mse = function(object, newdata, id, response, ...){
+  # The call has each argument to the regsubsets function indexed.
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form, data = newdata)
+  coefi = coef(object, id = id)
+  # get names of coefficient variables
+  xvars = names(coefi)
+  # matrix multiplication of X * beta
+  yPred = mat[,xvars] %*% coefi
+  return(mean((newdata[,response] - yPred)^2))
+}
+
+test.mse = rep(0, 20)
+train.mse = rep(0, 20)
+for(i in 1:20){
+  test.mse[i] = predict.mse(best.subset, data[-idx,], i, "y")
+  train.mse[i] = predict.mse(best.subset, data[idx,], i, "y")
+}
+pts = data.frame(variables = rep(1:20),
+                 train.mse = train.mse, 
+                 test.mse = test.mse)
+
+min.labels = data.frame(var = c(which.min(pts$test.mse), which.min(pts$train.mse)),
+                        mse = c(round(min(pts$test.mse),2), 
+                                round(min(pts$train.mse),2)))
+
+ggplot(pts, aes(variables)) +
+  geom_line(aes(y = train.mse), colour = "green4") +
+  geom_point(aes(which.min(train.mse), min(train.mse)), colour ="green4") +
+  geom_line(aes(y = test.mse), colour = "orange") +
+  geom_point(aes(which.min(test.mse), min(test.mse)), colour ="orange") +
+  geom_text(data=min.labels, aes(var, mse, label = mse), 
+                      vjust = -0.6, colour = c("orange","green4")) +
+  theme(legend.position = "None")
+
+coef(best.subset, id=11)
+
