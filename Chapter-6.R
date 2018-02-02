@@ -4,6 +4,7 @@ library(leaps)
 library(pls)
 library(MASS)
 library(ggplot2)
+library(tidyr)
 
 ###################################################################################
 ######### Exerciese 8
@@ -118,7 +119,7 @@ MSTOTAL.TEST = mean((College$Apps[-idx] - mean(College$Apps[-idx]))^2)
 # Ordinary Least Squares
 lm.fit = lm(Apps ~ ., data=College, subset = idx)
 testLM.mse = mean((College$Apps[-idx] - predict(lm.fit, newdata = College[-idx,]))^2)
-lm.testr2 = 1 - testLM.mse / MSTOTAL.TEst
+lm.testr2 = 1 - testLM.mse / MSTOTAL.TEST
 
 # Ridge
 mm = model.matrix(Apps ~ ., data=College)[,-1]
@@ -153,7 +154,7 @@ summary(pls.fit)
 testPLS.mse = mean((College$Apps[-idx] -  predict(pls.fit, newdata=College[-idx,],
                                                   type="response", ncomp=1:9))^2)
 pls.testr2 = 1 - testPLS.mse / MSTOTAL.TEST
-
+rm(list=ls())
 #Results
 r2 = data.frame(method = c("Linear_Model","Ridge", "Lasso", "PCR", "PLS"),
                 R2 = c(lm.testr2, ridge.testr2, lasso.testr2, pcr.testr2,
@@ -163,6 +164,8 @@ estimates = data.frame("Linear_Model" = coef(lm.fit),
                        "Lasso" = predict(lasso.fit, s = "lambda.min", type="coefficients")[,1],
                        "PCR" = as.numeric(coef(pcr.fit, ncomp=9, intercept = T)),
                        "PLS" = as.numeric(coef(pls.fit, ncomp = 9, intercept = T)))
+estimates$est_names = rownames(estimates)
+rownames(estimates) = 1:nrow(estimates)
 
 ggplot(r2, aes(x = reorder(method, -R2), y = R2)) +
   geom_point(aes(size=R2), color="blue") +
@@ -181,11 +184,54 @@ ggplot(d, aes(method, estimates)) +
   labs(color = "Method", y = "Estimates",
        title = "Coefficient estimates for different methods",
        subtitle = "College dataset from ISLR package") +
-  facet_wrap(~est_names, scales = "free_y", nrow = 3) +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  facet_wrap(~est_names, scales = "free_y", nrow = 6) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        axis.title.x = element_blank())
   
 # Comments
+# Among all the models, the highest test r-squared is 87% which is achieved
+# by OLS and Lasso, Ridge is slightly worse at 86% following PLS with 83%.
+# Of all these methods performance on test data is worse by PCR.
+# Thus, using Least Squares and Lasso model we can predict 87% of number of 
+# applications received by universities.
+#
+# Lasso sets 4 variables (Top25perc, F.Undergrad, Books, perc.alumni) to 
+# exactly 0. Although, Ridge and Least Squares estimates Top25perc and 
+# perc.alumni to be highly important with coefficients > |3| and the other
+# two to be less important with estimates less than |1|.
+# PCR and PLS are worse at estimating these coefficients with values for 
+# some that are > |250|, this discrepancy in estimates is also reflected
+# by the test erro and test R-squared for these models.
+#
+# Thus based on the approach to select the simplest model that explains
+# the data well, in this case with the given dataset and split of 80:20
+# between training and test set, Lasso performs the best.
+#
+# Below is the model fit with the full dataset.
+mm = model.matrix(Apps ~ ., data=College)[,-1]
+lasso.fit = cv.glmnet(x = mm, y = College$Apps, alpha = 1, standardize = T)
+plot(lasso.fit)
+predict(lasso.fit, s = "lambda.1se", type="coefficients")
+mean((College$Apps - predict(lasso.fit, s="lambda.min", newx = mm))^2)
 
-
-
-
+# One caviat is that based on the full dataset, Lasso does not shrink any of
+# the estimates to 0 for the minimum value of lambda.
+# 
+# Using the Generalized Linear Hypothesis test on model with minimum lambda
+# as the full model and the model with lambda 1 standard error away as the 
+# reduced model. (Reduced model only has 3 non-zero parameters and the 
+# intercet)
+# H0: Reduced and full model are the same
+# H1: Reduced and full model are different
+#
+# Based on the F-test below the p-value is significant, thus we reject H0 and
+# claim H1.
+# Since, the test is significant, reduced and full models explain the response
+# with significant difference. Thus we want the model that explains the response
+# well, thus we choose the full model.
+df.reduced = nrow(College) - 4
+df.full = nrow(College) - 18
+mse.reduced = sum((College$Apps - predict(lasso.fit, s="lambda.1se", newx = mm))^2) / df.reduced
+mse.full = sum((College$Apps - predict(lasso.fit, s="lambda.min", newx = mm))^2) / df.full
+f.statistic = (mse.reduced - mse.full)/(df.reduced - df.full) / mse.full
+pf(f.statistic, df1 = (df.reduced - df.full), df2 = df.full)
