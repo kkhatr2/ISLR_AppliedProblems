@@ -236,10 +236,12 @@ mse.full = sum((College$Apps - predict(lasso.fit, s="lambda.min", newx = mm))^2)
 f.statistic = (mse.reduced - mse.full)/(df.reduced - df.full) / mse.full
 pf(f.statistic, df1 = (df.reduced - df.full), df2 = df.full)
 rm(list=ls())
+
 ################################################################################
 ### Problem 10
 ################################################################################
 n = 1000
+set.seed(123)
 eps = rnorm(n)
 data = data.frame(x1 = rnorm(n), 
                   x2 = rnorm(n), 
@@ -262,9 +264,10 @@ data = data.frame(x1 = rnorm(n),
                   x19 = rcauchy(n),
                   x20 = rcauchy(n))
 
-data$y = as.matrix(cbind(rep(1,n), data[,1:12]), ncol=13) %*%
-                  matrix(c(1,2,0.9,-1,0.5, 6, -5, 10, -1.1, -7,3.3, -1, 1), 
-                         ncol=1)+eps
+betas = matrix(c(1,2,0.9,-1,0.5, 6, -5, 10, -1.1, -7,3.3, -1, 1,
+                 rep(0, 8)), ncol=1)
+
+data$y = as.matrix(cbind(rep(1,n), data[,1:12]), ncol=13) %*% betas[1:13,] + eps
 set.seed(0)
 idx = sample(1:n, 100)
 
@@ -289,6 +292,7 @@ for(i in 1:20){
   test.mse[i] = predict.mse(best.subset, data[-idx,], i, "y")
   train.mse[i] = predict.mse(best.subset, data[idx,], i, "y")
 }
+
 pts = data.frame(variables = rep(1:20),
                  train.mse = train.mse, 
                  test.mse = test.mse)
@@ -297,14 +301,67 @@ min.labels = data.frame(var = c(which.min(pts$test.mse), which.min(pts$train.mse
                         mse = c(round(min(pts$test.mse),2), 
                                 round(min(pts$train.mse),2)))
 
-ggplot(pts, aes(variables)) +
-  geom_line(aes(y = train.mse), colour = "green4") +
-  geom_point(aes(which.min(train.mse), min(train.mse)), colour ="green4") +
-  geom_line(aes(y = test.mse), colour = "orange") +
-  geom_point(aes(which.min(test.mse), min(test.mse)), colour ="orange") +
-  geom_text(data=min.labels, aes(var, mse, label = mse), 
-                      vjust = -0.6, colour = c("orange","green4")) +
-  theme(legend.position = "None")
+d = gather(pts, key=type, value=mse, test.mse, train.mse, factor_key = T)
 
-coef(best.subset, id=11)
+ggplot(d, aes(variables, mse)) +
+  geom_line(aes(color=type)) +
+  geom_point(data=min.labels, aes(var, mse, color=c("test.mse","train.mse"))) +
+  geom_text(data=min.labels, aes(var, mse, label=mse, color=c("test.mse","train.mse")),
+            vjust= -0.6) +
+  labs(x = "Variables", y = "MSE", title="MSE Vs #Variables",
+       subtitle="Using Training and Test Data", color="Type") +
+  scale_x_continuous(breaks = seq(0,20,1))
+
+coef(best.subset, id=12)
+
+
+l2.norm = rep(-1, 20)
+for(i in 1:20){
+  coefsi = coef(best.subset, id=i)
+  len = length(coefsi)
+  sum.sq.beta = sum((coefsi - betas[1:len])^2)
+  l2.norm[i] = sqrt(sum.sq.beta)
+  rm(sum.sq.beta, coefsi, len)
+}
+plot(l2.norm, type="b", main="L2 Norm Vs # Variables", ylab = "L2 Norm",
+     xlab = "# of Variables")
+
+# Comments
+# MSE takes on the minimum value when all the relevant variables are in the model.
+# Thus, MSE is minimum when all 12 variables are in the model that generated the 
+# response.
+# Based on the training and testing MSE plot we can see that as more 
+# variables are added to the model, training MSE decreases but testing MSE inc.
+#
+# When all relevant variables that generated the response are in the model,
+# the parameter estimates are very close to the original betas.
+# This phenemenon can be seen from a plot of the "ell"2 norm, which is minimum
+# for model with 12 variables and the intercept.
+rm(list=ls())
+###############################################################################
+### Problem 11
+###############################################################################
+
+# Using the Boston dataset from MASS package
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
