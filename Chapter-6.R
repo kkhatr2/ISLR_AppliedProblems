@@ -6,6 +6,18 @@ library(MASS)
 library(ggplot2)
 library(tidyr)
 
+predict.mse = function(object, newdata, id, response, ...){
+  # The call has each argument to the regsubsets function indexed.
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form, data = newdata)
+  coefi = coef(object, id = id)
+  # get names of coefficient variables
+  xvars = names(coefi)
+  # matrix multiplication of X * beta
+  yPred = mat[,xvars] %*% coefi
+  return(mean((newdata[,response] - yPred)^2))
+}
+
 ###################################################################################
 ######### Exerciese 8
 ###################################################################################
@@ -274,18 +286,6 @@ idx = sample(1:n, 100)
 best.subset = regsubsets(y ~ ., data[idx,], nvmax = 20)
 summary(best.subset)
 
-predict.mse = function(object, newdata, id, response, ...){
-  # The call has each argument to the regsubsets function indexed.
-  form = as.formula(object$call[[2]])
-  mat = model.matrix(form, data = newdata)
-  coefi = coef(object, id = id)
-  # get names of coefficient variables
-  xvars = names(coefi)
-  # matrix multiplication of X * beta
-  yPred = mat[,xvars] %*% coefi
-  return(mean((newdata[,response] - yPred)^2))
-}
-
 test.mse = rep(0, 20)
 train.mse = rep(0, 20)
 for(i in 1:20){
@@ -341,27 +341,66 @@ rm(list=ls())
 ###############################################################################
 ### Problem 11
 ###############################################################################
-
 # Using the Boston dataset from MASS package
+boston = Boston
 
+set.seed(0)
+idx = sample(1:nrow(boston), nrow(boston) * 0.8)
+best.subset = regsubsets(crim ~ ., data=boston, nvmax=13, subset = idx)
 
+s = summary(best.subset)
+plot(best.subset, scale="Cp")
+plot(best.subset, scale="bic")
 
+par(mfrow=(c(2,2)))
+plot(s$rss)
+points(which.min(s$rss), min(s$rss), col="red")
+plot(s$adjr2)
+points(which.max(s$adjr2), max(s$adjr2), col="red")
+plot(s$cp)
+points(which.min(s$cp), min(s$cp), col="red")
+plot(s$bic)
+points(which.min(s$bic), min(s$bic), col="red")
+par(mfrow=(c(1,1)))
 
+test.mse = rep(-1, 13)
+train.mse = rep(-1,13)
+for(i in 1:13){
+  test.mse[i] = predict.mse(best.subset, boston[-idx,], i, "crim")
+  train.mse[i] = predict.mse(best.subset, boston[idx,], i, "crim")
+}
 
+best.min.mse = test.mse[9]
 
+plot(train.mse, col="red", type = 'l')
+lines(test.mse, col="blue")
 
+coef(best.subset, id=9)
 
+# Lasso
+mm = model.matrix(crim ~ ., data=boston)[,-1]
+glm.boston = cv.glmnet(x = mm[idx,], y = boston$crim[idx], alpha = 1, 
+                       standardize = T)
 
+predict(glm.boston, type="coefficients", s = "lambda.min")
+glm.pred = predict(glm.boston, newx = mm[-idx,], s = "lambda.min")
 
+lasso.min.mse = mean((boston$crim[-idx] - glm.pred)^2)
 
+plot(boston$crim[-idx] - glm.pred)
 
-
-
-
-
-
-
-
-
-
-
+# Data was split 80:20 for training and testing.
+# Using the best-subset method we get the almost minimum MSE using 9 variables.
+# Cp and BIC are minimum for 7 and 3 variables respectively but, adjusted r-sq
+# is highest for the 9 variable model and the 9 variable model also gives 
+# appreciably small MSE.
+# Using the lasso method also gives an almost similar MSE to the best subset
+# selection but, lasso shrinks only three variables to zero giving an effective
+# model with 10 variables.
+#
+# Thus, based on only prediction performance the best subset method gives the 
+# best results with 9 variables.
+# From a robust point of view, theoretical assumptions have to be checked to 
+# deem the model appropriate for extrapolation and true prediction purposes
+# Without checking for assumptions the current model is good for interpolation
+# extrapolation should be done very carefully with domain knowledge.
