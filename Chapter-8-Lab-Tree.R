@@ -58,6 +58,7 @@ set.seed(1)
 # Doing a 50:50 split for training and testing the dataset
 idx = sample(1:nrow(Boston), size = nrow(Boston)/2)
 
+# Using the partykit glmtree method
 tree.boston = glmtree(medv ~ ., data=Boston, subset = idx, family = gaussian)
 summary(tree.boston)
 AIC(tree.boston)
@@ -98,12 +99,3 @@ pred = predict(tree.rp.prune, newdata = Boston[-idx,])
 # A tree with one less split produces about the same test R-sq (0.70)as the 
 # full tree, thus the tree is simpler and offers the same prediction as the 
 # full tree.
-
-
-
-
-
-
-
-
-
