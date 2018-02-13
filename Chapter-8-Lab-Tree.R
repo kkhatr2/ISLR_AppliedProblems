@@ -1,6 +1,8 @@
 library(rpart)
 library(ISLR)
 library(ggplot2)
+library(MASS)
+library(partykit)
 
 ################################################################################
 #### Classification trees
@@ -48,22 +50,54 @@ pred = predict(tree.pr, newdata=Carseats[-idx,], type="class")
 a = table(pred, High = Carseats[-idx,12])
 sum(diag(a))/sum(a) # Misclassification error after pruning = 0.255
 # Thus pruning the tree produced a silpler tree with better prediction accuracy.
-
+rm(list=ls())
 ################################################################################
 #### Regression trees
 ################################################################################
+set.seed(1)
+# Doing a 50:50 split for training and testing the dataset
+idx = sample(1:nrow(Boston), size = nrow(Boston)/2)
 
+tree.boston = glmtree(medv ~ ., data=Boston, subset = idx, family = gaussian)
+summary(tree.boston)
+AIC(tree.boston)
+BIC(tree.boston)
 
+plot(tree.boston)
+plot(tree.boston, tp_args = list(cdplot = TRUE))
+plot(tree.boston, terminal_panel = NULL)
 
+pred = predict(tree.boston, newdata = Boston[-idx,], type = "response")
 
+1 - mean((pred - Boston$medv[-idx])^2)/mean((Boston$medv[-idx] - mean(Boston$medv[-idx]))^2)
 
+pred.tr = predict(tree.boston, newdata = Boston[idx,], type="response")
 
+1 - mean((pred.tr - Boston$medv[idx])^2)/mean((Boston$medv[idx] - mean(Boston$medv[idx]))^2)
 
+# Using rpart package
+tree.rp.boston = rpart(medv ~ ., data = Boston, subset = idx, method = "anova")
+print(tree.rp.boston)
+plot(as.party.rpart(tree.rp.boston))
 
+# Prediction on the default dataset
+pred = predict(tree.rp.boston, newdata = Boston[-idx,])
+1 - mean((pred - Boston[-idx,"medv"])^2) / mean((Boston[-idx,"medv"] - mean(Boston[-idx,"medv"]))^2)
+# Test R-sq = 0.706 using the full tree.
 
+# Pruning the tree
+# Cp suggests that a tree with number of splits = 6 gives the low error
+plotcp(tree.rp.boston, upper = "splits")
+printcp(tree.rp.boston)
 
+tree.rp.prune = prune.rpart(tree.rp.boston, cp = 0.016523)
+plot(as.party.rpart(tree.rp.prune))
 
-
+pred = predict(tree.rp.prune, newdata = Boston[-idx,])
+1 - mean((pred - Boston[-idx,"medv"])^2) / mean((Boston[-idx,"medv"] - mean(Boston[-idx,"medv"]))^2)
+# A tree with one less split produces about the same test R-sq (0.70)as the 
+# full tree, thus the tree is simpler and offers the same prediction as the 
+# full tree.
 
 
 
