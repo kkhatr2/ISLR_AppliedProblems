@@ -59,13 +59,12 @@ set.seed(1)
 idx = sample(1:nrow(Boston), size = nrow(Boston)/2)
 
 # Using the partykit glmtree method
-tree.boston = glmtree(medv ~ ., data=Boston, subset = idx, family = gaussian)
+tree.boston = glmtree(medv ~ lstat |., data=Boston, subset = idx, family = gaussian)
 summary(tree.boston)
 AIC(tree.boston)
 BIC(tree.boston)
 
 plot(tree.boston)
-plot(tree.boston, tp_args = list(cdplot = TRUE))
 plot(tree.boston, terminal_panel = NULL)
 
 pred = predict(tree.boston, newdata = Boston[-idx,], type = "response")
@@ -75,6 +74,10 @@ pred = predict(tree.boston, newdata = Boston[-idx,], type = "response")
 pred.tr = predict(tree.boston, newdata = Boston[idx,], type="response")
 
 1 - mean((pred.tr - Boston$medv[idx])^2)/mean((Boston$medv[idx] - mean(Boston$medv[idx]))^2)
+# Model based regression tree performs significantly better than a regression
+# tree that creates splits by exhaustive selection of SSE using all variables
+# Model based Regression tree TEST R-SQUARED = 0.785
+# Pruned Regression tree TEST R-SQUARED = 0.7004
 
 # Using rpart package
 tree.rp.boston = rpart(medv ~ ., data = Boston, subset = idx, method = "anova")
@@ -99,3 +102,24 @@ pred = predict(tree.rp.prune, newdata = Boston[-idx,])
 # A tree with one less split produces about the same test R-sq (0.70)as the 
 # full tree, thus the tree is simpler and offers the same prediction as the 
 # full tree.
+
+###############################################################################
+######### Bagging and Random Forest
+###############################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
