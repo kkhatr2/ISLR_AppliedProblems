@@ -59,7 +59,7 @@ set.seed(1)
 idx = sample(1:nrow(Boston), size = nrow(Boston)/2)
 
 # Using the partykit glmtree method
-tree.boston = glmtree(medv ~ lstat |., data=Boston, subset = idx, family = gaussian)
+tree.boston = glmtree(medv ~ lstat | ., data=Boston, subset = idx, family = gaussian)
 summary(tree.boston)
 AIC(tree.boston)
 BIC(tree.boston)
@@ -106,19 +106,88 @@ pred = predict(tree.rp.prune, newdata = Boston[-idx,])
 ###############################################################################
 ######### Bagging and Random Forest
 ###############################################################################
+library(randomForest)
+# Performing Bagging on the Boston dataset.
+# since bagging uses only 2/3 of the training data for model fitting,
+# I will split the data into 70:30 for testing and training
+set.seed(1)
+idx = sample(1:nrow(Boston), nrow(Boston) * 0.7, replace = F)
 
+bag.boston = randomForest(medv ~ ., data=Boston, subset = idx, ntree = 60,
+                         mtry = ncol(Boston) - 1, importance = T)
+summary(bag.boston)
+bag.boston
 
+yhat.bag = predict(bag.boston, newdata = Boston[-idx,])
+plot(yhat.bag, Boston$medv[-idx])
+abline(0, 1)
 
+# Bagging with 500 trees produced a test R-Squared = 0.818
+# based on 70:30 split
+1 - sum((yhat.bag - Boston$medv[-idx])^2) / sum((Boston$medv[-idx]-mean(Boston$medv[-idx]))^2)
+# MSE of predicted "medv" is 5.5 lower than mean total sum of squares.
+mean((yhat.bag - Boston$medv[-idx])^2)
+mean((Boston$medv[-idx]-mean(Boston$medv[-idx]))^2)
 
+#####
+# Random Forest
+#####
+# Growing a random forest proceedes in the same way as bagging but, random
+# forest takes a smaller value for "mtry" with p/3 for regressionand sqrt(p) for
+# classification. I'm not using exactly p/3 here.
+set.seed(1)
+rf.boston = randomForest(medv ~ ., data=Boston, subsest = idx, mtry = 6,
+                         importance = T)
+rf.boston
+rf.pred = predict(rf.boston, newdata = Boston[-idx,])
+plot(rf.pred, Boston$medv[-idx])
+abline(0,1,col="red")
+1 - mean((rf.pred - Boston$medv[-idx])^2)/mean((Boston$medv[-idx]-mean(Boston$medv[-idx]))^2)
+mean((rf.pred - Boston$medv[-idx])^2)
+# Amazingly, random forest predicts "medv" with 97% accuracy for the test data.
+# and the MSE = 1.77 i.e. the variance is very low.
+importance(rf.boston)
+varImpPlot(rf.boston)
+# Variance Importance gives 2 columns of importance measures.
+# 1. %IncMSE: Mean decrease of accuracy in predictions on the out of bag
+#             samples, when the variable is excluded from the model.
+# 2. IncNotePurity: Total Decrease in node impurity from splits over that variable.
+# Read above comments like a statistician would think.
 
+#######
+### Boostin
+#######
+library(gbm)
 
+set.seed(1)
+boost.boston = gbm(medv ~ ., data=Boston[idx,], distribution = "gaussian",
+                   n.trees = 5000, shrinkage = 0.01, interaction.depth = 2,
+                   bag.fraction = 0.66, train.fraction = 0.7,
+                   cv.folds = 10, verbose = F, n.cores = 4)
 
+summary(boost.boston)
 
+# Partial plots: These illustrate marginal effect of the selected variables on
+#                the response after integrating out the other variables.
+# These plots show marginal effect of the selected variable to the response.
+# In this case, as the number of rooms "rm" increase, "medv" increases and,
+# as "lstat," lower socio economic status increases median house value "medv"
+# goes down. Which is intuitive foe all general purposes.
+par(mfrow=c(1,2))
+plot(boost.boston, i="rm")
+plot(boost.boston, i="lstat")
+par(mfrow=c(1,1))
 
+yhat.boost = predict(boost.boston, newdata = Boston[-idx,], n.trees = 5000)
+1 - mean((yhat.boost-Boston$medv[-idx])^2)/mean((Boston$medv[-idx]-mean(Boston$medv[-idx]))^2)
+mean((yhat.boost-Boston$medv[-idx])^2)
 
-
-
-
+# Gradient boosting in this case gives worse results than random forest but 
+# about the same as boosting. Doing a grid search on the parameter space could
+# give better results.
+# Below results are on test data:
+# Boosting R-Square = 0.858
+# Random Fore R-Square = 0.979
 
 
 
