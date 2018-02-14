@@ -188,7 +188,3 @@ mean((yhat.boost-Boston$medv[-idx])^2)
 # Below results are on test data:
 # Boosting R-Square = 0.858
 # Random Fore R-Square = 0.979
-
-
-
-
