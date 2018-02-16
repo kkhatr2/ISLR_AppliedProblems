@@ -49,6 +49,7 @@ ggplot(res.df, aes(mtry, rmse)) +
   facet_wrap(~ntree) +
   labs(y = "RMSE", title= "RMSE Vs mtry for various \"ntree\"")
 
+rm(list=ls())
 # Comments
 # As the plot above suggests, the best model among the parameters used is
 # the random forest model with "ntree" = 170 and "mtry" = 5.
@@ -57,3 +58,51 @@ ggplot(res.df, aes(mtry, rmse)) +
 # for a bagged model is with 510 trees.
 #
 # finalModel object from "caret" is based on the best performance on testing set
+
+## Problem 8
+# Using the Carseats dataset from ISLR package for regression.
+inTraining = createDataPartition(Carseats$Sales, p = 0.75, list=F)
+
+rpart.tree = rpart(Sales ~ ., data = Carseats, subset = inTraining)
+pred = predict(rpart.tree, newdata = Carseats[-inTraining,])
+
+mean((Carseats$Sales[-inTraining] - pred)^2)
+rpart.tree
+plot(as.party(rpart.tree))
+plotcp(rpart.tree, upper="splits")
+rpart.tree$variable.importance
+rpart.tree$cptable
+
+# Comments
+# With the full tree without any pruning MSE = 4.95
+# The full tree has 16 internal nodes including the root and 17 leaves and uses
+# 8 variables, Income and Urban are not used in the tree.
+#
+# Using cross-validation select the best model and select pruning parameters.
+# Pruning parameters for cp are used from the range of the above method.
+training = createDataPartition(Carseats$Sales, p = 0.75, list=F)
+fitTrain = trainControl(method = "cv",
+                        number = 10,
+                        p = 0.8)
+
+rp.fit = train(Sales ~ ., data = Carseats[training,],
+               method ="rpart",
+               trControl = fitTrain,
+               metric = "RMSE",
+               maximize = F,
+               tuneLength = 13)
+
+rp.fit$bestTune
+fm = rp.fit$finalModel
+plot(as.party(fm))
+pred1 = predict(rp.fit, newdata = Carseats[-training,])
+
+mean((pred1 - Carseats$Sales[-training])^2)
+
+# Based on 10 fold cross-validation and training on 75% of the data and testing
+# on 25% of the data. 
+# The full model with 16 splits results in a MSE of 4.45037 and 
+# the reduced mdodel with 6 splits (nodes) and 7 leaves gives a very comparable
+# MSE of 4.474901 and cp = 0.02597716
+# So, the reduced model does give a similar model with much less complexity using
+# only 4 variables instead of 8 in the full model.
