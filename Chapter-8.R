@@ -7,7 +7,7 @@ library(MASS)
 library(ggplot2)
 library(caret)
 library(doParallel)
-
+library(data.table)
 #### 7
 cl = makePSOCKcluster(4)
 registerDoParallel(cl, cores=4)
@@ -84,7 +84,7 @@ training = createDataPartition(Carseats$Sales, p = 0.75, list=F)
 fitTrain = trainControl(method = "cv",
                         number = 10,
                         p = 0.8)
-
+set.seed(0)
 rp.fit = train(Sales ~ ., data = Carseats[training,],
                method ="rpart",
                trControl = fitTrain,
@@ -104,5 +104,53 @@ mean((pred1 - Carseats$Sales[-training])^2)
 # The full model with 16 splits results in a MSE of 4.45037 and 
 # the reduced mdodel with 6 splits (nodes) and 7 leaves gives a very comparable
 # MSE of 4.474901 and cp = 0.02597716
-# So, the reduced model does give a similar model with much less complexity using
-# only 4 variables instead of 8 in the full model.
+# So, the reduced model does give a similar performing model with much less 
+# complexity using only 3 variables instead of 8 in the full model and 6 splits
+# in the reduced as opposed to 15 in the full model.
+# Variables used for the regression tree are:
+# ShelveLocation, Price, Age
+#
+#
+# Using Bagging for the Carseata dataset.
+set.seed(1)
+cs.bag = randomForest(x = Carseats[training,-1], y = Carseats[training, 1],
+                      xtest = Carseats[-training, -1], ytest = Carseats[-training,1],
+                      mtry = 10, importance = T, keep.forest = T)
+varImpPlot(cs.bag)
+cs.bag
+
+# Partial plots for the most important variables
+partialPlot(cs.bag, pred.data = Carseats[training,-1], x.var = "ShelveLoc", plot = T)
+partialPlot(cs.bag, pred.data = Carseats[training,-1], x.var = "Price", plot = T)
+partialPlot(cs.bag, pred.data = Carseats[training,-1], x.var = "CompPrice", plot = T)
+rm(list=ls())
+# Test set MSE of Bagging with 500 trees results an Test_MSE = 2.75 with an
+# Test_R-squared = 67.6%
+set.seed(0)
+training = createDataPartition(Carseats[,1], p = 0.75, list = F)
+
+cl = makePSOCKcluster(16)
+registerDoParallel(cl, cores=8)
+set.seed(1)
+cs.rf = train(x = Carseats[,-1], y = Carseats[,1],
+              subset = training,
+              tuneGrid = data.frame(mtry = 1:10),
+              method = "rf", ntree = 300, importance = T,
+              trControl = trainControl(search = "grid", allowParallel = T,
+                                       savePredictions = T))
+stopCluster(cl)
+rm(cl)
+
+plot(cs.rf)
+cs.rf$bestTune
+varImpPlot(cs.rf$finalModel)
+cs.rf$finalModel
+cs.rf$results
+
+# 10 Fold Cross-validation suggests the best Test_MSE = 2.71 with mtry = 7
+# As the number of predictors to split by increases, the error rate decreases.
+# This is the case in this dataset because only 2 of the variables are deemed
+# important and as the probability of them being in the model increases, the
+# MSE goes down. It is only because of these two variables that causes a major
+# decrease in MSE and increase in node purity.
+
