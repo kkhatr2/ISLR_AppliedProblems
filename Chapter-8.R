@@ -146,11 +146,70 @@ cs.rf$bestTune
 varImpPlot(cs.rf$finalModel)
 cs.rf$finalModel
 cs.rf$results
-
+rm(list=ls())
 # 10 Fold Cross-validation suggests the best Test_MSE = 2.71 with mtry = 7
 # As the number of predictors to split by increases, the error rate decreases.
 # This is the case in this dataset because only 2 of the variables are deemed
 # important and as the probability of them being in the model increases, the
 # MSE goes down. It is only because of these two variables that causes a major
 # decrease in MSE and increase in node purity.
+
+###############################################################################
+###### Problem 9
+###############################################################################
+oj = OJ
+
+set.seed(123)
+training = sample(1:nrow(oj), 800, replace = F)
+
+oj.tree = rpart(Purchase ~ ., data=oj, subset = training, method = "class")
+
+plot(oj.tree)
+text(oj.tree, use.n = T)
+print(oj.tree)
+oj.tree$cptable
+
+plotcp(oj.tree, upper="splits")
+
+pred.tr = predict(oj.tree, newdata = oj[training,], type = "class")
+# Training misclassification error.
+mean(ifelse(pred.tr == oj[training,1], 0, 1))
+
+pred = predict(oj.tree, newdata = oj[-training,], type="class")
+# Confusion Matrix for the testing data.
+table(pred, Obs = oj[-training,1])
+# Misclassification error for testing data.
+mean(ifelse(pred == oj[-training,1], 0, 1))
+
+# The tree has 10 terminal nodes and 9 internal nodes.
+# One of the purest terminal node is Node-4 with a probability of detecting
+# class = "CH" = 0.94 and from that node there are 18 misclassifications out of
+# 301 observations.
+# Training Error rate on the full tree is 0.15
+# Testing Eror rate on the full tree is 0.18
+
+xmat = xpred.rpart(oj.tree, 10)
+
+xerr = (xmat - as.numeric(oj[training,1]))
+# 10 fold Cross validated misclassification errors for the 4 cp values
+apply(xerr, 2, mean)
+
+pr.tree = prune(oj.tree, cp = 0.01347571)
+plot(as.party(pr.tree))
+
+pred = predict(pr.tree, newdata = oj[-training,-1], type="class")
+
+table(pred, Obs = oj[-training,1])
+# Misclassification error for testing data.
+mean(ifelse(pred == oj[-training,1], 0, 1))
+
+
+# 10-fold Cross validation suggests that the best tree is the full tree for
+# cp = 0.01 and 9 splits Misclassification error = 0.19. 
+# But the smaller tree with cp = 0.0135 and 4 splits has a comparable 
+# Misclass = 0.1925 and a Test-Misclass = 0.1815 displaying that the smaller
+# tree is good for prediction purposes.
+# This is bound to be the case when only about 2 variables are deemed important,
+# LoyalCH and PriceDiff
+
 
