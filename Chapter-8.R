@@ -8,6 +8,8 @@ library(ggplot2)
 library(caret)
 library(doParallel)
 library(data.table)
+library(plyr)
+library(glmnet)
 #### 7
 cl = makePSOCKcluster(4)
 registerDoParallel(cl, cores=4)
@@ -213,3 +215,98 @@ mean(ifelse(pred == oj[-training,1], 0, 1))
 # LoyalCH and PriceDiff
 
 
+###############################################################################
+###### Problem 10
+###############################################################################
+hit = as.data.table(Hitters)
+
+# Remove observations without "Salary" variable and log transform the "Salary"
+hit = hit[!is.na(Salary)]
+hit$Salary = log(hit$Salary)
+
+# Split into training and testing, training = 1:200
+inTraining = hit[1:200]
+inTesting = hit[-c(1:200)]
+
+cl = makePSOCKcluster(10)
+registerDoParallel(cl)
+fitControl = trainControl(allowParallel = T,
+                          search = "grid",
+                          savePredictions = T)
+tuneGr = expand.grid(n.trees = 1000, 
+                     interaction.depth = 1,
+                     shrinkage = seq(0.001, 0.1, length.out = 10),
+                     n.minobsinnode = 10)
+set.seed(12)
+hit.boost = train(x = inTraining[,!c("Salary")],
+                  y = inTraining$Salary,
+                  method = "gbm",
+                  tuneGrid = tuneGr,
+                  trControl = fitControl)
+stopCluster(cl)
+rm(cl, tuneGr, fitControl)
+
+# plot of RMSE Vs Shrinkage
+ggplot(hit.boost)
+
+
+summary(hit.boost)           # The Best variables are CAtBat, CRuns, cWalks
+plot(hit.boost$finalModel, "CAtBat") # partial plot for CAtBat
+plot(hit.boost$finalModel, "CRuns")  # Partial plot for CRuns
+plot(hit.boost$finalModel, "CWalks") # Parial Plot for Cwalks
+
+# For comparison to a linear model
+hit.lm = lm(Salary ~ ., data = inTraining)
+
+mm = model.matrix(Salary ~ ., data = inTraining)[,-1]
+# alpha = 1 for Lasso
+hit.lasso = glmnet(x = mm,
+                   y = inTraining[,c(Salary)],
+                   family = "gaussian",
+                   standardize= T,
+                   alpha = 1)
+hit.ridge = glmnet(x = mm,
+                   y = inTraining[,c(Salary)],
+                   family = "gaussian",
+                   standardize= T,
+                   alpha = 0)
+
+hit.bag = randomForest(x = inTraining[,-c("Salary")],
+                       y = inTraining[,c(Salary)],
+                       mtry = ncol(inTraining) - 1,
+                       importance = T,
+                       xtest = inTesting[,-c("Salary")],
+                       ytest = inTesting[,c(Salary)])
+
+bag.mse = mean((inTesting[,c(Salary)] - hit.bag$test$predicted)^2)
+varImpPlot(hit.bag)
+# MSE for GBM is very low when compared to the lasso, ridge and linear model
+# approach. Bagging is even better than GBM.
+pred.grid = data.frame(method = c("gbm", "lm","lasso", "ridge", "bagging"),
+                       testMSE = c(pred_MSE(hit.boost, inTesting, "Salary"),
+                                   pred_MSE(hit.lm, inTesting, "Salary"),
+                                   pred_MSE(hit.lasso, inTesting, "Salary", s=1),
+                                   pred_MSE(hit.ridge, inTesting, "Salary", s=1),
+                                   bag.mse))
+rm(hit.lasso, hit.ridge, hit.lm, mm, hit.bag, bag.mse)
+
+# Plot of Test MSE for different methods.
+ggplot(pred.grid, aes(reorder(method, testMSE), testMSE)) +
+  geom_point(aes(size = testMSE, color = method), alpha = 0.5) +
+  geom_text(aes(label = round(testMSE, 2)), vjust = -0.6) +
+  labs(x = "Method", y = "Test-MSE") +
+  theme(legend.position = "None")
+
+# Function to predict and calculate MSE.
+pred_MSE = function(object, newData, responseVariable, s = NA){
+  if(is.na(s))
+    pred = predict(object, newData)
+  else{
+    mm = model.matrix(Salary ~ ., data = newData)[,-1]
+    pred = predict(object, newx = mm, s = min(object$lambda))
+  }
+  
+  sq_err = (pred - newData[,responseVariable, with = F])^2
+  mse = mean(sq_err)
+  return(mse)
+}
