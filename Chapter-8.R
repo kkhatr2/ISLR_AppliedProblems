@@ -10,6 +10,7 @@ library(doParallel)
 library(data.table)
 library(plyr)
 library(glmnet)
+library(gbm)
 #### 7
 cl = makePSOCKcluster(4)
 registerDoParallel(cl, cores=4)
@@ -270,7 +271,6 @@ hit.ridge = glmnet(x = mm,
                    family = "gaussian",
                    standardize= T,
                    alpha = 0)
-
 hit.bag = randomForest(x = inTraining[,-c("Salary")],
                        y = inTraining[,c(Salary)],
                        mtry = ncol(inTraining) - 1,
@@ -310,3 +310,52 @@ pred_MSE = function(object, newData, responseVariable, s = NA){
   mse = mean(sq_err)
   return(mse)
 }
+
+rm(list=ls())
+###############################################################################
+###### Problem 11
+###############################################################################
+# High Dimensional dataset with 86 predictors and 5822 observations.
+caravan = as.data.table(Caravan)
+#caravan$Purchase = as.integer(caravan$Purchase) - 1
+inTraining = Caravan[1:1000,]
+inTesting = Caravan[-c(1:1000),]
+
+cl = makePSOCKcluster(10)
+registerDoParallel(cl)
+set.seed(123)
+caravan.gbm = train(Purchase ~ .
+                  ,data=inTraining
+                  ,method = "gbm"
+                  ,metric = "ROC"
+                  ,verbose = F
+                  ,trControl = trainControl(classProbs = T,
+                                            summaryFunction = twoClassSummary,
+                                            method = "repeatedcv",
+                                            number = 10,
+                                            repeats = 5,
+                                            allowParallel = T)
+                  ,tuneGrid = expand.grid(n.trees = 1000,
+                                     shrinkage = 0.01,
+                                     n.minobsinnode = 10,
+                                     interaction.depth = 1))
+                  
+rm(cl)
+summary(caravan.gbm)
+
+plot(caravan.gbm$finalModel, i = "PPERSAUT")
+plot(caravan.gbm$finalModel, i = "MKOOPKLA")
+plot(caravan.gbm$finalModel, i = "MOPLHOOG")
+plot(caravan.gbm$finalModel, i = "MBERMIDD")
+
+caravan.pred = predict(caravan.gbm, newdata = inTesting)
+library(e1071)
+confusionMatrix(caravan.pred, inTesting$Purchase)
+
+probs = predict(caravan.gbm, inTesting, type="prob")
+
+rc = AUC::roc(probs[,2], inTesting[,"Purchase"])
+plot(rc)
+
+table(Obs = inTesting$Purchase, Pred = ifelse(probs[,2] > 0.2, "Yes", "No"))
+
