@@ -151,6 +151,25 @@ svmfit = svm(y ~ ., data=dat, kernel = "radial", cost = 10, gamma = 1)
 plot(svmfit, dat)
 summary(svmfit)
 
+# Application to Gene Expression Data
+# The Khan data set consists of a number of tisue samples corresponding to four
+# distinct types of blue cell tumors.
+# Gene expression measurements are available for each tissue smaple.
+# Khan consists of training and testing data sets and is a classic example of
+# p >> n, with 2308 variables and a small number of observations.
+data = data.frame(x = Khan$xtrain, y = as.factor(Khan$ytrain))
+
+out = svm(y ~ ., data=data, kernel = "linear", cost = 10)
+summary(out)
+
+table(out$fitted, data$y)
+
+testData = data.frame(x = Khan$xtest, y = as.factor(Khan$ytest))
+test.pred = predict(out, newdata = testData)
+tab = table(pred = test.pred, obs = testData$y)
+1 - diag(tab)/sum(tab)
+
+
 
 
 
