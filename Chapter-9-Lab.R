@@ -68,14 +68,14 @@ summary(svmfit)
 set.seed(1)
 x = matrix(rnorm(200 * 2), ncol = 2)
 x[1:100,] = x[1:100,] + 2
-x[101:200,] = x[101:200,] - 2
+x[101:150,] = x[101:150,] - 2
 y = c(rep(1, 150), rep(2, 50))
 dat = data.frame(x = x, y = as.factor(y))
 
 # Because of induced separation of the simulated dataset and, because of 
 # intentionally overlapping the class labels. The class boundary is non-linear
-ggplot(dat, aes(x[,1], x[,2])) +
-  geom_point(aes(color = factor(y)))
+ggplot(dat, aes(x.1, x.2)) +
+  geom_point(aes(color = y))
 
 # Splitting the data and fitting using the svm() function with radial kernel
 # and, gamma = 1
@@ -103,9 +103,10 @@ summary(tune.out)
 plot(tune.out$best.model, dat[train,])
 
 # Predicting With the best model
-# 31% observations are misclassified by this model
+# 13% observations are misclassified by this model
 ypred = predict(tune.out$best.model, newdata = dat[-train,])
-table(true = dat[-train,"y"], preict = ypred)
+tab = table(true = dat[-train,"y"], preict = ypred)
+1 - sum(diag(tab))/sum(tab)
 
 # Function to predict and plot ROC curve
 library(pROC)
@@ -169,8 +170,43 @@ test.pred = predict(out, newdata = testData)
 tab = table(pred = test.pred, obs = testData$y)
 1 - diag(tab)/sum(tab)
 
+# 9.6.2 Support Vector Machine
+# Generating some data with non-linear class boundary
+set.seed(1)
+x = matrix(rnorm(200 * 2), ncol = 2)
+x[1:100,] = x[1:100,] +2
+x[101:150,] = x[101:150,] -2
+y = c(rep(1, 150), rep(2, 50))
+dat = data.frame(x = x, y = as.factor(y))
 
+# By the plot below; the boundary is indeed non-linear
+ggplot(dat, aes(x.1, x.2)) +
+  geom_point(aes(color = y))
 
+# splitting the data randomly into training and testing groups
+train = sample(1:200, 100)
+
+# Here we do get quite some misclassifications. We can reduce the cost to 
+# correct this but this will come with the cost of irregular boundaries and
+# overfitting the data.
+svmfit = svm(y ~ ., data = dat[train,], kernel = "radial", gamma = 1, cost = 1)
+plot(svmfit, dat)
+summary(svmfit)
+
+# Thus, performing cross validation to tune for the best cost and gamma values
+set.seed(1)
+tune.out = tune("svm", y ~ ., data=dat[train,], kernel = "radial",
+                ranges = list(cost = c(0.1,1,10,100,1000),
+                              gamma = c(0.5, 1, 2, 3, 4)))
+# 10-fold cross-validation suggests the best model with cost = 1, gamma = 0.5
+summary(tune.out)
+
+bestMod = tune.out$best.model
+bestMod.pred = predict(bestMod, newdata = dat[-train,])
+tab = table(pred = bestMod.pred, truth = dat$y[-train])
+1 - sum(diag(tab))/sum(tab)
+# With the cross validated model parameters and test dataset, we get a prediction
+# misclassification of 12%
 
 
 
