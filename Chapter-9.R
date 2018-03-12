@@ -1,6 +1,8 @@
 library(e1071)
 library(ggplot2)
 library(ROCR)
+library(ISLR)
+library(caret)
 
 # conceptual exercise 3
 data = data.frame(x.1 = c(3,2,4,1,2,4,4),
@@ -86,11 +88,109 @@ res = data.frame(method = c("Linear", "Quadratic", "Radial"),
                  misclass = c(linear.misclass, poly.misclass, radial.misclass))
 
 # Based on the results for this simulated dataset, Quadratic kernel gave the 
-# worse misclassification error of the test data forllowed by the linear and
+# worse misclassification error of the test data followed by the linear and
 # radial kernel was the best.
 # This has been consistent for all generated datasets.
 ggplot(res, aes(reorder(method, -misclass), misclass)) +
   geom_bar(aes(fill = method), stat = "identity") +
   labs(x = "Method", y = "Misclassification Error",
        title = "Misclassification Error of Test Data") +
+  theme(legend.position = "none")
+
+rm(list = ls())
+###############################################################################
+#### Problem 7, using the Auto data set to classify high or low mileage
+###############################################################################
+auto = Auto[,-c(1, 9)]
+auto$mpg = as.factor(ifelse(Auto$mpg > median(Auto$mpg), 1, -1))
+
+set.seed(123)
+train = sample(1:nrow(auto), nrow(auto)*0.7)
+pairs(auto)
+# Trying the linear kernel
+set.seed(1)
+linear.tune = tune("svm", mpg ~ ., data = auto[train,], kernel = "poly", d = 1,
+                   ranges = list(cost = c(0.1, 1, 10, 100, 1000),
+                                 gamma = c(0.5, 1, 2, 3, 4)))
+
+summary(linear.tune)
+summary(linear.tune$best.model)
+
+linear.pred = predict(linear.tune$best.model, newdata = auto[-train,])
+linear.tab = table(auto$mpg[-train], linear.pred)
+linear.misclass = 1 - sum(diag(linear.tab)) / sum(linear.tab)
+
+plot(linear.tune$best.model, auto[train,], year ~ weight)
+
+# Comments:
+# Best cross validated error rate using the training data is 0.07 with 
+# cost = 1 and gamma = 0.5.
+# A lower value of cost suggests that the margin is highly non-linear and uses
+# 65 support vectors out of 274 total which is about 24% of the training data.
+# Thus with the linear kernel, a high misclassification error should be expected.
+# BUt, surprisingly the misclassification rate is 10%! with the test data.
+
+# Now trying a polynomial kernel with various degree, cost and gamma params.
+set.seed(1)
+poly.tune = tune("svm", mpg ~ ., data = auto, kernel = "poly",
+                 ranges = list(d = c(2,3,4,5),
+                               cost = c(0.1,1,10,100,1000),
+                               gamma = c(0.5, 1, 2, 3, 4)))
+summary(poly.tune)
+summary(poly.tune$best.model)
+poly.pred = predict(poly.tune$best.model, newdata = auto[-train,])
+poly.tab = table(auto$mpg[-train], poly.pred)
+poly.misclass = 1 - sum(diag(poly.tab)) / sum(poly.tab)
+
+plot(poly.tune$best.model, auto[train,], origin ~ displacement)
+
+# Comments:
+# Best cross validated error rate using the training data is 0.07 with
+# degree = 3, cost = 1 and gamma = 0.5
+# A cubic fit suggests that the margin is highly non-linear and uses 79 support
+# vectors which is about 29% of the training data. Whcih also may suggest that
+# the margins of cubic polynomial kernel are not as rigid as the linear kernel.
+# As a comparison cross validated error for the linear kernel is also the same
+# and the best linear kernel model uses only 65 support vectors. This suggests
+# that the cubic polynomial kernel does not offer any more information about the 
+# response and may overfit.
+# But the polynomial misclassification error on the testing data is much better
+# at 0.04 which more than twice as better as the linear kernel. Thus, the cubic
+# polynomial kenel does give a better predicting model even though the cross
+# vadiated error is the same.
+
+# Now trying the radial kenel
+radial.tune = tune("svm", mpg ~ ., data = auto[train,], kernel = "radial",
+                   ranges = list(gamma = c(0.5, 1,2,3,4),
+                                 cost = c(0.1, 1, 10, 50, 100)))
+summary(radial.tune)
+summary(radial.tune$best.model)
+
+radial.pred = predict(radial.tune$best.model, newdata = auto[-train,])
+radial.tab = table(auto$mpg[-train], radial.pred)
+radial.misclass = 1 - sum(diag(radial.tab)) / sum(radial.tab)
+
+# Comments:
+# Again the cross validated errors are the same as the linear and polynomial
+# kernel. 
+# Crossvalidated best parameters for the radial kernel are:
+# gamma = 1 and cost = 1.
+# Although the cv errors are the same, radial kernel with the above paramaters
+# use 144 support vectors, which is 52% of the training data. Suggesting that
+# the radial kernel's margins are very irregular and the radial kernel possibly
+# overfits the data.
+# This overfit is reflected in the misclassification error of test data of 0.07.
+# This error rate is slightly better than linear kernel but the complexity is 
+# not worth only an improvement of 3%
+
+res = data.frame(method = c("Linear", "Cubic", "Radial"),
+                 misclass = c(linear.misclass, poly.misclass, radial.misclass))
+
+# Based on the results for this dataset, cubic kernel gave the 
+# best misclassification error of the test data followed by the radial and
+# linear kernel.
+ggplot(res, aes(reorder(method, -misclass), misclass)) +
+  geom_bar(aes(fill = method), stat = "identity") +
+  labs(x = "Method", y = "Misclassification Error",
+       title = "Misclassification Error of Test Data (Auto data set)") +
   theme(legend.position = "none")
