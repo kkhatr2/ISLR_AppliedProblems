@@ -194,3 +194,103 @@ ggplot(res, aes(reorder(method, -misclass), misclass)) +
   labs(x = "Method", y = "Misclassification Error",
        title = "Misclassification Error of Test Data (Auto data set)") +
   theme(legend.position = "none")
+
+rm(list = ls())
+###############################################################################
+#### Problem 8, using the OJ data set from ISLR package
+###############################################################################
+set.seed(1)
+train = sample(1:nrow(OJ), 800)
+
+linear.svm = caclSVM(OJ, "linear", 1, train, list(d = 1, cost = 0.01))
+linear.train.misclass = calcMisclass(OJ$Purchase[train],linear.svm$fitted)
+linear.pred = predict(linear.svm, newdata = OJ[-train,])
+linear.misclass = calcMisclass(OJ$Purchase[-train], linear.pred)
+
+# With Cost = 0.01, i.e. a very wide margin the training error rate= 0.166 and
+# the test error rate = 0.18. Because the training and testing error rates
+# are not too different, the results are not too bad uinsg the linear kernel. 
+# Although, the support vectors are 432 i.e. 54% of the training dat, thus
+# the boundaries are very flexible and the linear kernel probably underfits the 
+# data
+
+linear.tune = tuneSVM(OJ, "linear", 1, train, 
+                      list(cost = seq(0.01, 10, length.out = 10)))
+
+# Cross validation does not produce any better results, the CV cost is still 0.01
+
+# Using the Radial kernel
+radial.svm = calcSVM(OJ, "radial", 1, train, list(gamma = 0.5, cost = 0.01))
+radial.train.misclass = calcMisclass(OJ$Purchase[train], radial.svm$fitted)
+radial.pred = predict(radial.svm, newdata = OJ[-train,])
+radial.misclass = calcMisclass(OJ$Purchase[-train], radial.pred)
+
+radial.tune = tuneSVM(OJ, "radial", 1, train, list(gamma= c(0.5,1,2,3,4), 
+                                                   cost=seq(0.01, 10, length.out = 10)))
+
+radial.tune.pred = predict(radial.tune$best.model, newdata = OJ[-train,])
+radial.tune.misclass = calcMisclass(OJ$Purchase[-train], radial.tune.pred)
+
+# Radial kernel gives a wose fit with cost = 0.01, the CV cost = 1.12 and
+# the default and CV gamma = 0.5 with a miscalassification rate of the test
+# data = 0.41 and 0.38 respectively for each cost.
+
+# Polynomial kernel
+poly.tune = tuneSVM(OJ, "poly", 1, train, 
+                    list(d= 2, cost = seq(0.01, 10, length.out = 10)))
+summary(poly.tune$best.model)
+poly.pred = predict(poly.tune$best.model, newdata=  OJ[-train,])
+poly.misclass = calcMisclass(OJ$Purchase[-train], poly.pred)
+
+# The polynomial kernel produces about the same results as the linear kenel
+# although the support vectors a less than when using the linear kernel.
+# So, I will suggest the best model as the polynomila kernel SVM with
+# degree = 2 and cost = 5.56
+
+
+tuneSVM = function(data, kernel, responseIndex, traindIDX, params){
+  nm = names(data)
+  
+  form = as.formula(paste(nm[responseIndex], " ~", 
+                          paste(nm[-responseIndex], collapse = "+")))
+  set.seed(1)
+  myTune = tune("svm", form, data = data[traindIDX,],
+                kernel = kernel, ranges = params)
+  print(summary(myTune))
+  return(myTune)
+}
+
+calcSVM = function(data, kernel, responseIndex, trainIDX, params){
+  gamma = 0.5
+  cost = 1
+  d = 1
+  if(kernel == "poly")
+    d = params$d
+  
+  if(kernel == "radial")
+    gamma = params$gamma
+  
+  if(!is.na(params$cost))
+    cost = params$cost
+
+  nm = names(data)
+  
+  form = as.formula(paste(nm[responseIndex], " ~", 
+                          paste(nm[-responseIndex], collapse = "+")))
+  my.svm = svm(form, data = data[trainIDX,], 
+               kernel = kernel, cost = cost, gamma = gamma, d=d)
+  print(summary(my.svm))
+  return (my.svm)
+}
+
+calcMisclass = function(true, pred){
+  tab = table(true, pred)
+  mc = 1 - sum(diag(tab)) / sum(tab)
+  return (mc)
+}
+
+
+
+
+
+
