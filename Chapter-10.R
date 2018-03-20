@@ -137,7 +137,9 @@ ggplot(res, aes(K, ss)) +
 # Using K-means algorithm on the first 2 components of PCA
 # Using K-means in conjunction to PCA gives a between SS to total Ss ratio
 # of 0.995!!!!
-# Amazing!!
+# Amazing!! But this was expected because, from the plot above of the first two
+# principal components, maximum difference between the three classes is 
+# explained by the first two components. And, the difference is substancial.
 sim.pca.km = kmeans(sim.pca$x[,1:2], centers = 3, nstart = 20)
 
 sim.pca.km$betweenss / sim.pca.km$totss
