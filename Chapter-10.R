@@ -35,3 +35,29 @@ num.sum = apply(arrests.pca$x, MARGIN = 2, FUN = function(x) sum(x^2))
 pve = num.sum/den.sum
 plot(pve, type = "b", col = "red", ylim = c(0,1))
 lines(cumsum(pve), col = "blue")
+
+rm(list = ls())
+##################################################################################
+###### Problem 9
+# Clustering States based on crime data
+##################################################################################
+# using the raw data.
+arrests = USArrests
+arrests.dist = dist(arrests)
+arrests.hc = hclust(arrests.dist, method = "complete")
+plot(arrests.hc, cex = 0.6)
+cutree(arrests.hc, k = 3)
+rect.hclust(arrests.hc, k = 3, border = c("red","blue","cyan"))
+
+# Using scaled data
+arrests.sc = scale(USArrests)
+arrests.sc.dist = dist(arrests.sc)
+arrests.sc.hc = hclust(arrests.sc.dist)
+plot(arrests.sc.hc, cex = 0.7)
+rect.hclust(arrests.sc.hc, k = 2, border = c("red","blue","cyan"))
+
+# Comments
+# Since the variables in this data set were measured at different scales and have
+# different variances, it is best to scale the data. After scaling the data,
+# the distance between different variables is on the same scale and the clusters
+# will be more representative of the different variables in the data set.
