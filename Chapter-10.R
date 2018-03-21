@@ -209,3 +209,5 @@ table(pat.2.cu)
 d = data[pat.1.cu != pat.2.cu,]
 diff.genes = rownames(d)
 dim(d)
+
+rm(list = ls())
