@@ -144,6 +144,68 @@ sim.pca.km = kmeans(sim.pca$x[,1:2], centers = 3, nstart = 20)
 
 sim.pca.km$betweenss / sim.pca.km$totss
 
+rm(list = ls())
 
+#################################################################################
+###### Problem 11
+# Gene dataset from ISLR's website
+#################################################################################
+data = read.csv("http://www-bcf.usc.edu/~gareth/ISL/Ch10Ex11.csv", header = F)
 
+tdata = t(data)
 
+gene.dist = as.dist(1 - cor(data))
+gene.hc = hclust(gene.dist, method = "complete")
+gene.cut = cutree(gene.hc, k = 2)
+plot(gene.hc)
+rect.hclust(gene.hc, k = 2)
+
+# Based on the correlation distance and complete linkage, 
+# heirarchical clustering is not convincingly successful at separating the 
+# two groups. Single, average and centroid linkage are worse.
+# And the heirarchical clustering method misclassified 10 patients.
+# Because in the dataset 20 patients are diseased and 20 are healthy.
+gene.gp1 = tdata[gene.cut == 1,]
+gene.gp2 = tdata[gene.cut == 2,]
+
+# For genes that differ the most across the two groups.
+# I believe the strategy may be, to apply clustering onece more separately
+# to each dataset and compare genes to identify which genes are similar
+# and not among the two datasets. 
+# The hypothesis will be can clustering classify healthy and non-healthy genes
+# among diseased and non-diseased patients.
+# This time instead of computing correlations, i will compute distances between
+# each pair of genes.
+
+# Using the transpose of dataset to have patients as columns and genes as rows.
+# Based on the gene classification into 2 groups, I believe that clustering
+# identifies 10 patients as healthy because they appear to have about equal 
+# number of genes in 2 clusters.
+pat.1 = dist(t(gene.gp1))
+pat.1.hc = hclust(pat.1, method = "complete")
+plot(pat.1.hc)
+rect.hclust(pat.1.hc, k = 2)
+pat.1.cu = cutree(pat.1.hc, k = 2)
+table(pat.1.cu)
+
+# On the other hand the second set of 30 patients, after clustering into 
+# 2 groups have a small number of genes in one of the groups.
+# So, I believe these patients are diseased, and 10 of these 
+# are misclassified also. I believe these are dieased because usually there are 
+# a small number of genes that are out of order for a person to have a disease.
+pat.2 = dist(t(gene.gp2))
+pat.2.hc = hclust(pat.2, method = "complete")
+plot(pat.2.hc, cex = 0.6)
+rect.hclust(pat.2.hc, k = 2)
+pat.2.cu = cutree(pat.2.hc, k = 2)
+table(pat.2.cu)
+
+# So, when comparing these 2 clusters from these 2 datasets.
+# I will compare both these groups and different genes from each
+# group are different.
+# So, there are 496 genes that are different in healthy and diseased patients.
+# Out of these 110 can be identified as the ones causing disease and the rest
+# 386 may need to be examined further.
+d = data[pat.1.cu != pat.2.cu,]
+diff.genes = rownames(d)
+dim(d)
